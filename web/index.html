@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>QR Attendance Scanner (Prototype)</title>
+  <style>body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:16px} #reader{width:360px}</style>
+</head>
+<body>
+  <h1>QR Attendance Scanner (Prototype)</h1>
+  <p>Opens camera, scan student's college ID QR (contains registration number). The scanner posts to the server to mark attendance.</p>
+  <div id="reader"></div>
+  <pre id="out"></pre>
+  <script src="https://unpkg.com/html5-qrcode@2.3.7/minified/html5-qrcode.min.js"></script>
+  <script>
+    const server = prompt('Server base URL (e.g. http://localhost:3000)') || 'http://localhost:3000';
+    const deviceId = prompt('Device ID (any string)') || 'web-scanner-1';
+    const out = document.getElementById('out');
+
+    function postCheckin(payload) {
+      fetch(server + '/attendance/checkin', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ qr: payload, device_id: deviceId })
+      }).then(r => r.json()).then(j => {
+        out.textContent = JSON.stringify(j, null, 2);
+      }).catch(e => out.textContent = 'Error: ' + e);
+    }
+
+    const html5QrCode = new Html5Qrcode("reader");
+    const config = { fps: 10, qrbox: 250 };
+    html5QrCode.start(
+      { facingMode: "environment" },
+      config,
+      (decodedText, decodedResult) => {
+        try {
+          const parsed = JSON.parse(decodedText);
+          postCheckin(parsed);
+        } catch (e) {
+          // assume it's a plain registration string
+          postCheckin({ registration: decodedText });
+        }
+        navigator.vibrate?.(200);
+        html5QrCode.pause();
+        setTimeout(() => html5QrCode.resume(), 1400);
+      },
+      (errorMessage) => {
+        // ignore
+      }
+    ).catch(err => out.textContent = 'Camera error: ' + err);
+  </script>
+</body>
+</html>
